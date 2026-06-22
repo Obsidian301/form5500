@@ -1,4 +1,4 @@
-"""Streamlit interface for the Form 5500 Retirement-Plan Signal Finder."""
+"""Streamlit interface for the Form 5500 Lead Discovery Platform."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from schema import SchemaError
 
 
 st.set_page_config(
-    page_title="Form 5500 Retirement-Plan Signal Finder",
+    page_title="Form 5500 Lead Discovery Platform",
     page_icon="📊",
     layout="wide",
 )
@@ -91,12 +91,10 @@ US_STATE_OPTIONS = [
 def main() -> None:
     """Render the Streamlit application."""
 
-    st.title("Form 5500 Retirement-Plan Signal Finder")
+    st.title("Form 5500 Lead Discovery Platform")
     st.write(
-        "Find recently established Cash Balance and pay-related Defined Benefit plans "
-        "within a selected participant range. Participant counts are plan-size proxies, "
-        "and the results are prospecting signals rather than confirmed owner-retirement "
-        "or sale events."
+        "Filter by recently established Cash Balance and Defined Benefit plans, as well "
+        "as plan participant count."
     )
 
     with st.sidebar:

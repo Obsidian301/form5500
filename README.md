@@ -1,4 +1,4 @@
-# Form 5500 Retirement-Plan Signal Finder
+# Form 5500 Lead Discovery Platform
 
 This internal Streamlit application analyzes Department of Labor Form 5500 and Form 5500-SF CSV datasets to find companies with retirement-plan signals that may justify additional M&A or business-transition research. It focuses on recently established Cash Balance plans and pay-related Defined Benefit plan features in a selected participant range.
 
