@@ -12,6 +12,8 @@ from logic import (
     AnalysisSettings,
     analyze_csv,
     analyze_zip,
+    discover_state_options_csv,
+    discover_state_options_zip,
     file_sha256,
     inspect_zip_archive,
     write_uploaded_file_to_temp,
@@ -66,7 +68,14 @@ def main() -> None:
         )
         include_frozen = st.checkbox("Include Frozen Plans", value=False)
         include_unknown = st.checkbox("Include Initial Filings With Missing Effective Dates", value=False)
-        selected_states = st.multiselect("State Filter", options=[], default=[], placeholder="All States")
+        state_options = load_state_options_for_upload(uploaded)
+        selected_states = st.multiselect(
+            "State Filter",
+            options=state_options,
+            default=[],
+            placeholder="All States",
+            help="Populated from the uploaded file's sponsor state column when available.",
+        )
         signal_types = st.multiselect(
             "Signal Type Filter",
             options=["Cash Balance", "Pay-Related Defined Benefit", "Both"],
@@ -149,6 +158,29 @@ def main() -> None:
             Path(temp_path).unlink(missing_ok=True)
 
     render_results(result)
+
+
+def load_state_options_for_upload(uploaded) -> list[str]:
+    """Read available state values from an uploaded CSV or ZIP."""
+
+    if uploaded is None:
+        return []
+
+    suffix = Path(uploaded.name).suffix.lower()
+    if suffix not in {".csv", ".zip"}:
+        return []
+
+    temp_path: str | None = None
+    try:
+        temp_path = write_uploaded_file_to_temp(uploaded, suffix=suffix)
+        if suffix == ".csv":
+            return discover_state_options_csv(temp_path)
+        return discover_state_options_zip(temp_path)
+    except (AnalysisError, SchemaError):
+        return []
+    finally:
+        if temp_path:
+            Path(temp_path).unlink(missing_ok=True)
 
 
 @st.cache_data(max_entries=3, ttl="2h", show_spinner=False)

@@ -18,6 +18,8 @@ from logic import (
     copy_zip_member_to_tempfile,
     determine_anchor_date,
     discover_csv_members,
+    discover_state_options_csv,
+    discover_state_options_zip,
     inspect_zip_archive,
     normalize_boolean_flag,
     normalize_chunk,
@@ -67,6 +69,11 @@ def test_form_5500_sf_aliases_resolve() -> None:
     assert resolution.mapping["company_name"] == "SF_SPONSOR_NAME"
     assert resolution.mapping["ein"] == "SF_SPONS_EIN"
     assert resolution.source_form_type == "Form 5500-SF"
+
+
+def test_state_options_are_discovered_from_csv() -> None:
+    states = discover_state_options_csv(FIXTURES / "sample_form_5500.csv")
+    assert {"AZ", "CO", "ID", "NV", "OR", "TX", "UT", "WA"}.issubset(states)
 
 
 def test_ein_normalization_preserves_leading_zero_and_cleans_dot_zero() -> None:
@@ -294,6 +301,12 @@ def test_csv_member_matching_case_insensitive(tmp_path: Path) -> None:
     _make_zip(path, {"UPPER.CSV": Path(FIXTURES / "sample_form_5500_sf.csv").read_text()})
     info = inspect_zip_archive(path)
     assert info["csv_candidate_count"] == 1
+
+
+def test_state_options_are_discovered_from_zip(tmp_path: Path) -> None:
+    path = tmp_path / "states.zip"
+    _make_zip(path, {"main.csv": Path(FIXTURES / "sample_form_5500_sf.csv").read_text()})
+    assert discover_state_options_zip(path) == ["CO", "WY"]
 
 
 def test_zip_multiple_supported_files_return_selectable_candidates(tmp_path: Path) -> None:

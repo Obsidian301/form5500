@@ -587,6 +587,27 @@ def analyze_csv(
     return AnalysisResult(company_export, plan_export, metadata, warnings)
 
 
+def discover_state_options_csv(file_path: str | Path) -> list[str]:
+    """Return available two-letter state values from a supported CSV file."""
+
+    file_path = Path(file_path)
+    resolution = _resolve_csv_file_schema(file_path)
+    source_column = resolution.mapping.get("state")
+    if not source_column:
+        return []
+
+    states: set[str] = set()
+    try:
+        for chunk in pd.read_csv(file_path, dtype=str, usecols=[source_column], chunksize=CHUNKSIZE):
+            values = chunk[source_column].astype("string").fillna("").str.strip().str.upper()
+            states.update(value for value in values if re.fullmatch(r"[A-Z]{2}", value))
+    except pd.errors.EmptyDataError as exc:
+        raise AnalysisError("The uploaded CSV file is empty.") from exc
+    except ValueError as exc:
+        raise AnalysisError(f"State values could not be read from the uploaded CSV: {exc}") from exc
+    return sorted(states)
+
+
 def _prefilter_candidates(df: pd.DataFrame, settings: AnalysisSettings) -> pd.DataFrame:
     """Apply filters that do not require deduplication or final recency."""
 
@@ -1014,6 +1035,37 @@ def _combine_member_results(
         name: int(result.metadata["qualified_plan_count"]) for name, result in zip(selected_members, member_results)
     }
     return AnalysisResult(company_export, final_plan_export, metadata, warnings)
+
+
+def discover_state_options_zip(
+    file_path: str | Path,
+    selected_members: list[str] | None = None,
+) -> list[str]:
+    """Return available state values from supported CSV members in a ZIP archive."""
+
+    path = Path(file_path)
+    states: set[str] = set()
+    temp_paths: list[str] = []
+    try:
+        with zipfile.ZipFile(path) as archive:
+            infos = archive.infolist()
+            validate_zip_infos(infos, path.stat().st_size)
+            candidates = discover_csv_members(archive)
+            candidate_names = {candidate.filename for candidate in candidates}
+            member_names = selected_members or sorted(candidate_names)
+            for member_name in member_names:
+                if member_name not in candidate_names:
+                    continue
+                info = archive.getinfo(member_name)
+                temp_path = copy_zip_member_to_tempfile(archive, info)
+                temp_paths.append(temp_path)
+                states.update(discover_state_options_csv(temp_path))
+    except zipfile.BadZipFile as exc:
+        raise AnalysisError("The uploaded file is not a readable ZIP archive.") from exc
+    finally:
+        for temp_path in temp_paths:
+            _remove_tempfile(temp_path)
+    return sorted(states)
 
 
 def _plan_export_to_internal(plan_export: pd.DataFrame) -> pd.DataFrame:
