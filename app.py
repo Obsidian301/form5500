@@ -88,8 +88,30 @@ US_STATE_OPTIONS = [
 ]
 
 
+@st.dialog("Upload Form 5500 Dataset")
+def require_dataset_upload() -> None:
+    """Require a dataset upload before showing the application controls."""
+
+    st.write("Upload a DOL Form 5500 or Form 5500-SF CSV or ZIP archive to begin.")
+    st.markdown(
+        "You can download the source files from the "
+        "[Department of Labor Form 5500 datasets page]"
+        "(https://www.dol.gov/agencies/ebsa/about-ebsa/our-activities/public-disclosure/foia/form-5500-datasets)."
+    )
+    st.file_uploader(
+        "Upload Form 5500 or Form 5500-SF CSV or ZIP Archive",
+        type=["csv", "zip"],
+        key="uploaded_dataset",
+    )
+
+
 def main() -> None:
     """Render the Streamlit application."""
+
+    uploaded = st.session_state.get("uploaded_dataset")
+    if uploaded is None:
+        require_dataset_upload()
+        st.stop()
 
     st.title("Form 5500 Lead Discovery Platform")
     st.write(
@@ -101,6 +123,7 @@ def main() -> None:
         uploaded = st.file_uploader(
             "Upload Form 5500 or Form 5500-SF CSV or ZIP Archive",
             type=["csv", "zip"],
+            key="uploaded_dataset",
         )
         min_participants = st.number_input("Minimum Participants", min_value=0, value=10, step=1)
         max_participants = st.number_input("Maximum Participants", min_value=0, value=100, step=1)
@@ -152,10 +175,6 @@ def main() -> None:
             )
         combine_selected = st.checkbox("Combine Selected CSV Files", value=False)
         run = st.button("Run Analysis", type="primary")
-
-    if uploaded is None:
-        st.info("Upload a DOL Form 5500 or Form 5500-SF CSV or ZIP archive to begin.")
-        return
 
     suffix = Path(uploaded.name).suffix.lower()
     if suffix not in {".csv", ".zip"}:
