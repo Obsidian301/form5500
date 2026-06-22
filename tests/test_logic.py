@@ -32,6 +32,7 @@ from schema import SchemaError, resolve_schema
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
+ALL_SIGNAL_TYPES = ("Cash Balance", "Pay-Related Defined Benefit")
 
 
 def test_form_5500_aliases_resolve() -> None:
@@ -103,10 +104,13 @@ def test_exact_pension_code_matching() -> None:
 
 
 def test_frozen_excluded_by_default_and_included_when_enabled() -> None:
-    default = analyze_csv(FIXTURES / "sample_form_5500.csv", AnalysisSettings())
+    default = analyze_csv(
+        FIXTURES / "sample_form_5500.csv",
+        AnalysisSettings(signal_types=ALL_SIGNAL_TYPES),
+    )
     included = analyze_csv(
         FIXTURES / "sample_form_5500.csv",
-        AnalysisSettings(include_frozen_plans=True),
+        AnalysisSettings(include_frozen_plans=True, signal_types=ALL_SIGNAL_TYPES),
     )
     assert "Beta Tooling" not in set(default.company_leads["Company Name"])
     assert "Beta Tooling" in set(included.company_leads["Company Name"])
@@ -132,18 +136,25 @@ def test_anchor_date_prefers_date_received_and_falls_back() -> None:
 
 
 def test_future_outliers_are_excluded() -> None:
-    result = analyze_csv(FIXTURES / "sample_form_5500.csv", AnalysisSettings())
+    result = analyze_csv(
+        FIXTURES / "sample_form_5500.csv",
+        AnalysisSettings(signal_types=ALL_SIGNAL_TYPES),
+    )
     assert "Future Co" not in set(result.company_leads["Company Name"])
 
 
 def test_recent_effective_date_filter_is_optional() -> None:
     relaxed = analyze_csv(
         FIXTURES / "sample_form_5500.csv",
-        AnalysisSettings(max_plan_age_months=12),
+        AnalysisSettings(max_plan_age_months=12, signal_types=ALL_SIGNAL_TYPES),
     )
     strict = analyze_csv(
         FIXTURES / "sample_form_5500.csv",
-        AnalysisSettings(max_plan_age_months=12, require_recent_effective_date=True),
+        AnalysisSettings(
+            max_plan_age_months=12,
+            require_recent_effective_date=True,
+            signal_types=ALL_SIGNAL_TYPES,
+        ),
     )
     assert "Delta Labs" in set(relaxed.company_leads["Company Name"])
     assert "Delta Labs" not in set(strict.company_leads["Company Name"])
@@ -168,10 +179,16 @@ def test_initial_filing_flag_variants() -> None:
 
 
 def test_missing_date_initial_filings_default_and_enabled() -> None:
-    default = analyze_csv(FIXTURES / "sample_form_5500.csv", AnalysisSettings())
+    default = analyze_csv(
+        FIXTURES / "sample_form_5500.csv",
+        AnalysisSettings(signal_types=ALL_SIGNAL_TYPES),
+    )
     enabled = analyze_csv(
         FIXTURES / "sample_form_5500.csv",
-        AnalysisSettings(include_unknown_effective_initial_filings=True),
+        AnalysisSettings(
+            include_unknown_effective_initial_filings=True,
+            signal_types=ALL_SIGNAL_TYPES,
+        ),
     )
     assert "Missing Date Co" not in set(default.company_leads["Company Name"])
     assert "Missing Date Co" in set(enabled.company_leads["Company Name"])
@@ -200,10 +217,16 @@ def test_deduplication_runs_before_signal_filtering(tmp_path: Path) -> None:
         "Old Signal,123456789,25,1C,2024-01-01,Y,2025-01-01,001,2024-12-31,FILING_RECEIVED,0,A1\n"
         "Old Signal,123456789,25,2E,2024-01-01,Y,2025-02-01,001,2024-12-31,FILING_RECEIVED,1,A2\n"
     )
-    result = analyze_csv(csv, AnalysisSettings())
+    result = analyze_csv(csv, AnalysisSettings(signal_types=ALL_SIGNAL_TYPES))
     assert result.plan_details.empty
     assert result.metadata["deduplicated_record_count"] == 1
     assert result.metadata["duplicate_record_count"] == 1
+
+
+def test_empty_signal_filter_returns_all_participant_range_companies() -> None:
+    result = analyze_csv(FIXTURES / "sample_form_5500.csv", AnalysisSettings())
+    companies = set(result.company_leads["Company Name"])
+    assert {"Alpha Dental", "Beta Tooling", "Delta Labs", "Gamma Holdings"}.issubset(companies)
 
 
 def test_multiple_plans_under_one_ein_remain_distinct_before_aggregation(tmp_path: Path) -> None:

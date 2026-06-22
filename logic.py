@@ -357,6 +357,8 @@ def assign_confidence(df: pd.DataFrame) -> pd.DataFrame:
         return result
 
     def classify(row: pd.Series) -> tuple[str, str]:
+        if not row["has_code_1a"] and not row["has_code_1c"]:
+            return "Lower", "No Cash Balance or pay-related Defined Benefit code selected or detected."
         if row["has_code_1c"] and row["passes_recency"] and row["initial_filing"] and not row["has_code_1i"]:
             return "High", "Cash Balance code 1C, recent effective date, initial filing, and not frozen."
         if row["passes_recency"] and row["has_code_1c"]:
@@ -609,7 +611,7 @@ def discover_state_options_csv(file_path: str | Path) -> list[str]:
 
 
 def _prefilter_candidates(df: pd.DataFrame, settings: AnalysisSettings) -> pd.DataFrame:
-    """Apply filters that do not require deduplication or final recency."""
+    """Apply participant, state, and optional signal filters."""
 
     if df.empty:
         return df.copy()
@@ -620,14 +622,13 @@ def _prefilter_candidates(df: pd.DataFrame, settings: AnalysisSettings) -> pd.Da
     if filtered.empty:
         return filtered
     filtered = classify_signal(filtered)
-    filtered = filtered[filtered["has_code_1a"] | filtered["has_code_1c"]].copy()
-    if not settings.include_frozen_plans:
-        filtered = filtered[~filtered["has_code_1i"]].copy()
     if settings.states:
         selected = {state.upper() for state in settings.states}
         filtered = filtered[filtered["state"].astype("string").str.upper().isin(selected)].copy()
     if settings.signal_types:
         filtered = _filter_signal_types(filtered, settings.signal_types)
+        if not settings.include_frozen_plans:
+            filtered = filtered[~filtered["has_code_1i"]].copy()
     return filtered
 
 
@@ -654,7 +655,12 @@ def calculate_filter_diagnostics(df: pd.DataFrame, settings: AnalysisSettings) -
     ].copy()
     target = participant_match[participant_match["has_code_1a"] | participant_match["has_code_1c"]].copy()
     frozen_target = target[target["has_code_1i"]]
-    after_frozen = target if settings.include_frozen_plans else target[~target["has_code_1i"]]
+    if settings.signal_types:
+        after_signal = _filter_signal_types(participant_match, settings.signal_types)
+        after_frozen = after_signal if settings.include_frozen_plans else after_signal[~after_signal["has_code_1i"]]
+    else:
+        after_signal = participant_match
+        after_frozen = participant_match
     after_optional = after_frozen
     if settings.states:
         selected = {state.upper() for state in settings.states}
@@ -667,6 +673,7 @@ def calculate_filter_diagnostics(df: pd.DataFrame, settings: AnalysisSettings) -
         "participant_range_count": len(participant_match),
         "target_signal_including_frozen_count": len(target),
         "frozen_target_count": len(frozen_target),
+        "after_signal_filter_count": len(after_signal),
         "target_after_frozen_setting_count": len(after_frozen),
         "target_after_state_and_signal_filters_count": len(after_optional),
         "qualified_plan_count": 0,
@@ -698,6 +705,12 @@ def _finalize_candidates(
     if df.empty:
         return df.copy()
     recent = calculate_recency(df, anchor_date, settings.max_plan_age_months)
+    if not settings.signal_types:
+        return assign_confidence(recent).sort_values(
+            ["participant_count", "plan_effective_date"],
+            ascending=[False, False],
+            na_position="last",
+        )
     include_unknown = settings.include_unknown_effective_initial_filings
     if settings.require_recent_effective_date:
         mask = recent["passes_recency"].copy()

@@ -139,7 +139,8 @@ def main() -> None:
             "Signal Type Filter",
             options=["Cash Balance", "Pay-Related Defined Benefit", "Both"],
             default=[],
-            placeholder="All Signal Types",
+            placeholder="No Signal Filter",
+            help="Leave empty to show all companies in the participant range.",
         )
         combine_selected = st.checkbox("Combine Selected CSV Files", value=False)
         run = st.button("Run Analysis", type="primary")
@@ -270,6 +271,7 @@ def render_results(result) -> None:
                 "participant_range_count": "Inside Participant Range",
                 "target_signal_including_frozen_count": "With 1A or 1C Signal, Including Frozen",
                 "frozen_target_count": "Frozen Target Plans",
+                "after_signal_filter_count": "After Signal-Type Filter",
                 "target_after_frozen_setting_count": "After Frozen-Plan Setting",
                 "target_after_state_and_signal_filters_count": "After State and Signal-Type Filters",
                 "qualified_plan_count": "Qualified Plans Returned",
