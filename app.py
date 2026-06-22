@@ -135,13 +135,23 @@ def main() -> None:
             placeholder="All States",
             help="Leave empty to include all sponsor states.",
         )
-        signal_types = st.multiselect(
-            "Signal Type Filter",
-            options=["Cash Balance", "Pay-Related Defined Benefit", "Both"],
-            default=[],
-            placeholder="No Signal Filter",
-            help="Leave empty to show all companies in the participant range.",
+        signal_filter_mode = st.radio(
+            "Signal Filter Mode",
+            options=["All companies in participant range", "Only companies with selected plan signals"],
+            index=0,
+            help=(
+                "Choose all companies to ignore Cash Balance / Defined Benefit signal codes. "
+                "Choose selected plan signals to narrow results to 1A and/or 1C filings."
+            ),
         )
+        selected_signal_types: list[str] = []
+        if signal_filter_mode == "Only companies with selected plan signals":
+            selected_signal_types = st.multiselect(
+                "Signal Type Filter",
+                options=["Cash Balance", "Pay-Related Defined Benefit", "Both"],
+                default=["Cash Balance", "Pay-Related Defined Benefit"],
+                help="Select one or more signal types to require.",
+            )
         combine_selected = st.checkbox("Combine Selected CSV Files", value=False)
         run = st.button("Run Analysis", type="primary")
 
@@ -162,7 +172,7 @@ def main() -> None:
         include_frozen_plans=include_frozen,
         include_unknown_effective_initial_filings=include_unknown,
         states=tuple(selected_states),
-        signal_types=tuple(signal_types),
+        signal_types=tuple(selected_signal_types),
     )
 
     selected_members: list[str] | None = None
