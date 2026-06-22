@@ -98,11 +98,13 @@ def require_dataset_upload() -> None:
         "[Department of Labor Form 5500 datasets page]"
         "(https://www.dol.gov/agencies/ebsa/about-ebsa/our-activities/public-disclosure/foia/form-5500-datasets)."
     )
-    st.file_uploader(
+    uploaded = st.file_uploader(
         "Upload Form 5500 or Form 5500-SF CSV or ZIP Archive",
         type=["csv", "zip"],
         key="uploaded_dataset",
     )
+    if uploaded is not None:
+        st.rerun()
 
 
 def main() -> None:
